@@ -1,6 +1,6 @@
 import { getSandbox, LogEvent, parseSSEStream } from "@cloudflare/sandbox";
 
-function parseAIResponse(response: string) {
+export function parseAIResponse(response: string) {
   const sections = {
     files: [] as Array<{ path: string; content: string }>,
   };
@@ -89,7 +89,6 @@ const cloneRepoInSandbox = async (sandbox: ReturnType<typeof getSandbox>) => {
   await sandbox.exec("git clone https://github.com/harshil1712/vite-react.git");
   await sandbox.exec("cd vite-react && npm install");
   ls = await sandbox.exec("ls");
-  console.log(ls);
 };
 
 const writeAiCodeInSandbox = async (
@@ -108,7 +107,8 @@ const writeAiCodeInSandbox = async (
   }
   const cat = await sandbox.exec("cat src/App.tsx");
 
-  await sandbox.killAllProcesses();
+  // await sandbox.killAllProcesses();
+  await sandbox.exec(`pkill -f "npm run dev"`);
 
   // Start the development server
   const server = await sandbox.startProcess("npm run dev");
@@ -116,10 +116,10 @@ const writeAiCodeInSandbox = async (
   // Expose port for preview
   const preview = await sandbox.exposePort(8080, { hostname });
   console.log("[PREVIEW] Server running at:", preview.url);
-  
+
   // Monitor the server process (but don't block on it)
   const logStream = await sandbox.streamProcessLogs(server.id);
-  
+
   // Start monitoring logs in background
   (async () => {
     for await (const log of parseSSEStream<LogEvent>(logStream)) {
