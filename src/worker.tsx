@@ -42,13 +42,14 @@ const app = defineApp([
           system: PROMPT,
           messages: convertToModelMessages(messages),
           onFinish: async ({ text }) => {
-            console.log("AI Response:", text);
             const hostname = new URL(request.url).host;
             waitUntil(
-              writeAiCodeInSandbox(ctx.sandbox, text, hostname).then((previewUrl) => {
-                currentPreviewUrl = previewUrl;
-                console.log("[PREVIEW] URL stored:", previewUrl);
-              })
+              writeAiCodeInSandbox(ctx.sandbox, text, hostname).then(
+                (previewUrl) => {
+                  currentPreviewUrl = previewUrl;
+                  console.log("[PREVIEW] URL stored:", previewUrl);
+                }
+              )
             );
           },
         });
@@ -58,12 +59,12 @@ const app = defineApp([
     ),
     route("/preview-status", async () => {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           previewUrl: currentPreviewUrl,
-          status: currentPreviewUrl ? 'ready' : 'pending'
+          status: currentPreviewUrl ? "ready" : "pending",
         }),
-        { 
-          headers: { 'Content-Type': 'application/json' }
+        {
+          headers: { "Content-Type": "application/json" },
         }
       );
     }),

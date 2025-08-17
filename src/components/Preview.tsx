@@ -1,33 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import {
+  WebPreview,
+  WebPreviewNavigation,
+  WebPreviewUrl,
+  WebPreviewBody,
+} from "./ai-elements/web-preview";
 
 interface PreviewStatus {
   previewUrl: string | null;
-  status: 'pending' | 'ready';
+  status: "pending" | "ready";
 }
 
 export function PreviewPanel() {
   const [previewStatus, setPreviewStatus] = useState<PreviewStatus>({
     previewUrl: null,
-    status: 'pending'
+    status: "pending",
   });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const checkPreviewStatus = async () => {
       try {
-        const response = await fetch('/api/preview-status');
+        const response = await fetch("/api/preview-status");
         const status: PreviewStatus = await response.json();
         setPreviewStatus(status);
-        
+
         // Stop polling once we have a preview URL
         if (status.previewUrl) {
           return true; // Signal to stop polling
         }
         return false;
       } catch (error) {
-        console.error('Error checking preview status:', error);
+        console.error("Error checking preview status:", error);
         return false;
       }
     };
@@ -38,7 +44,7 @@ export function PreviewPanel() {
 
     const poll = async () => {
       const shouldStop = await checkPreviewStatus();
-      
+
       if (!shouldStop) {
         // Increase interval gradually (max 5 seconds)
         pollInterval = Math.min(pollInterval * 1.2, 5000);
@@ -69,7 +75,7 @@ export function PreviewPanel() {
           }}
           onLoad={() => setLoading(false)}
           onError={() => {
-            console.error('Iframe failed to load');
+            console.error("Iframe failed to load");
             setLoading(false);
           }}
         />
@@ -90,43 +96,54 @@ export function PreviewPanel() {
           color: "#6b7280",
         }}
       >
-        {previewStatus.status === 'pending' 
-          ? "Waiting for generated app..." 
-          : "Your generated app will appear here"
-        }
+        {previewStatus.status === "pending"
+          ? "Waiting for generated app..."
+          : "Your generated app will appear here"}
       </div>
     );
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        height: "100%",
-      }}
-    >
-      <div
-        style={{
-          padding: "1rem",
-          borderBottom: "1px solid #e5e7eb",
-          backgroundColor: "#f9fafb",
-        }}
-      >
-        <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: "600" }}>
-          Preview
-        </h2>
-      </div>
+    // <div
+    //   style={{
+    //     display: "flex",
+    //     flexDirection: "column",
+    //     height: "100%",
+    //   }}
+    // >
+    //   <div
+    //     style={{
+    //       padding: "1rem",
+    //       borderBottom: "1px solid #e5e7eb",
+    //       backgroundColor: "#f9fafb",
+    //     }}
+    //   >
+    //     <h2 style={{ margin: 0, fontSize: "1.125rem", fontWeight: "600" }}>
+    //       Preview
+    //     </h2>
+    //   </div>
 
-      <div
-        style={{
-          flex: 1,
-          padding: "1rem",
-          backgroundColor: "#ffffff",
-        }}
-      >
-        {renderContent()}
-      </div>
+    //   <div
+    //     style={{
+    //       flex: 1,
+    //       padding: "1rem",
+    //       backgroundColor: "#ffffff",
+    //     }}
+    //   >
+    //     {renderContent()}
+    //   </div>
+    // </div>
+    <div className="w-1/2 flex flex-col">
+      <WebPreview>
+        <WebPreviewNavigation>
+          <WebPreviewUrl
+            readOnly
+            placeholder="Your app here..."
+            value={previewStatus.previewUrl || ""}
+          />
+        </WebPreviewNavigation>
+        <WebPreviewBody src={previewStatus.previewUrl || ""} />
+      </WebPreview>
     </div>
   );
 }
