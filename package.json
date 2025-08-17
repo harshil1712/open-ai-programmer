@@ -64,6 +64,9 @@
       "prisma",
       "sharp",
       "workerd"
-    ]
+    ],
+    "overrides": {
+      "vite": "$vite"
+    }
   }
 }

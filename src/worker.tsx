@@ -8,7 +8,7 @@ import { env, waitUntil } from "cloudflare:workers";
 import { getSandbox, proxyToSandbox } from "@cloudflare/sandbox";
 import { writeAiCodeInSandbox } from "./app/utils/sandbox";
 import { openai } from "@ai-sdk/openai";
-import { generateText } from "ai";
+import { streamText, convertToModelMessages, type UIMessage } from "ai";
 import { PROMPT } from "../constant";
 
 export { Sandbox } from "@cloudflare/sandbox";
@@ -29,31 +29,23 @@ const app = defineApp([
     route(
       "/chat",
       async ({ request, ctx }: { request: Request; ctx: AppContext }) => {
-        const body = await request.json();
+        const { messages }: { messages: UIMessage[] } = await request.json();
         if (!ctx.sandbox) {
           console.error("Sandbox is not initialized");
         }
-        const { text } = await generateText({
+
+        const result = streamText({
           model: openai("gpt-4.1-mini-2025-04-14"),
           system: PROMPT,
-          prompt: body.message,
+          messages: convertToModelMessages(messages),
+          onFinish: async ({ text }) => {
+            console.log("AI Response:", text);
+            const hostname = new URL(request.url).host;
+            waitUntil(writeAiCodeInSandbox(ctx.sandbox, text, hostname));
+          },
         });
 
-        //         const text = `<file path="src/App.tsx">
-        // export default function App() {
-        //   return (
-        //     <div>
-        //       Hello World
-        //     </div>
-        //   );
-        // }
-        // </file>`;
-        console.log("AI Response:", text);
-        const hostname = new URL(request.url).host;
-
-        waitUntil(writeAiCodeInSandbox(ctx.sandbox, text, hostname));
-
-        return new Response("Chat API");
+        return result.toUIMessageStreamResponse();
       }
     ),
     // route("/preview", Preview)
