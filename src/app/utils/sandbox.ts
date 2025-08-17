@@ -96,7 +96,7 @@ const writeAiCodeInSandbox = async (
   sandbox: ReturnType<typeof getSandbox>,
   aiGeneratedCode: string,
   hostname: string
-) => {
+): Promise<string> => {
   await cloneRepoInSandbox(sandbox);
   // Parse AI response
   const sections = parseAIResponse(aiGeneratedCode);
@@ -116,15 +116,22 @@ const writeAiCodeInSandbox = async (
   // Expose port for preview
   const preview = await sandbox.exposePort(8080, { hostname });
   console.log("[PREVIEW] Server running at:", preview.url);
-  // Monitor the server process
+  
+  // Monitor the server process (but don't block on it)
   const logStream = await sandbox.streamProcessLogs(server.id);
-
-  for await (const log of parseSSEStream<LogEvent>(logStream)) {
-    if (log.type === "stdout" && log.data.includes("ERROR")) {
-      console.error("[ERROR]", log.data);
+  
+  // Start monitoring logs in background
+  (async () => {
+    for await (const log of parseSSEStream<LogEvent>(logStream)) {
+      if (log.type === "stdout" && log.data.includes("ERROR")) {
+        console.error("[ERROR]", log.data);
+      }
+      console.log("[LOG]", log.data);
     }
-    console.log("[LOG]", log.data);
-  }
+  })();
+
+  // Return the preview URL
+  return preview.url;
 };
 
 export { cloneRepoInSandbox, writeAiCodeInSandbox };

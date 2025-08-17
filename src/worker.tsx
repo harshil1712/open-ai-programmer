@@ -13,6 +13,9 @@ import { PROMPT } from "../constant";
 
 export { Sandbox } from "@cloudflare/sandbox";
 
+// Simple in-memory storage for preview URL
+let currentPreviewUrl: string | null = null;
+
 export type AppContext = {
   sandbox: ReturnType<typeof getSandbox>;
 };
@@ -41,13 +44,29 @@ const app = defineApp([
           onFinish: async ({ text }) => {
             console.log("AI Response:", text);
             const hostname = new URL(request.url).host;
-            waitUntil(writeAiCodeInSandbox(ctx.sandbox, text, hostname));
+            waitUntil(
+              writeAiCodeInSandbox(ctx.sandbox, text, hostname).then((previewUrl) => {
+                currentPreviewUrl = previewUrl;
+                console.log("[PREVIEW] URL stored:", previewUrl);
+              })
+            );
           },
         });
 
         return result.toUIMessageStreamResponse();
       }
     ),
+    route("/preview-status", async () => {
+      return new Response(
+        JSON.stringify({ 
+          previewUrl: currentPreviewUrl,
+          status: currentPreviewUrl ? 'ready' : 'pending'
+        }),
+        { 
+          headers: { 'Content-Type': 'application/json' }
+        }
+      );
+    }),
     // route("/preview", Preview)
   ]),
 ]);
