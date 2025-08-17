@@ -1,19 +1,21 @@
-# Standard RedwoodSDK Starter
+# Open AI Programmer
 
-This "standard starter" is the recommended implementation for RedwoodSDK. You get a Typescript project with:
+An AI-powered code generation platform built with RedwoodSDK and Cloudflare. This application provides a chat interface where users can describe what they want to build, and the AI generates complete React applications that run in real-time in a sandboxed environment.
 
-- Vite
-- database (Prisma via D1)
-- Session Management (via DurableObjects)
-- Passkey authentication (Webauthn)
-- Storage (via R2)
+## Features
 
-## Creating your project
+- **AI Code Generation**: Uses OpenAI GPT-4 to generate complete React applications
+- **Real-time Preview**: Generated code runs instantly in Cloudflare Sandbox
+- **Split Interface**: Chat on the left, live preview on the right
+- **React Server Components**: Server-side rendering with selective client hydration
+- **Cloudflare Infrastructure**: Built on Workers, D1, and Container runtime
+
+## Getting Started
 
 ```shell
-npx create-rwsdk my-project-name
-cd my-project-name
-npm install
+git clone https://github.com/harshil1712/open-ai-programmer.git
+cd open-ai-programmer
+pnpm install
 ```
 
 ## Running the dev server
@@ -22,41 +24,15 @@ npm install
 pnpm run dev
 ```
 
-Point your browser to the URL displayed in the terminal (e.g. `http://localhost:5173/`). You should see a "Hello World" message in your browser.
+Point your browser to the URL displayed in the terminal (e.g. `http://localhost:5173/`). You'll see the AI programmer interface with a chat panel and preview area.
 
 ## Deploying your app
 
-### Wrangler Setup
-
-Within your project's `wrangler.jsonc`:
-
-- Replace the `__change_me__` placeholders with a name for your application
-
-- Create a new D1 database:
-
 ```shell
-npx wrangler d1 create my-project-db
+pnpm run release
 ```
 
-Copy the database ID provided and paste it into your project's `wrangler.jsonc` file:
-
-```jsonc
-{
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "my-project-db",
-      "database_id": "your-database-id",
-    },
-  ],
-}
-```
-
-### Authentication Setup
-
-For authentication setup and configuration, including optional bot protection, see the [Authentication Documentation](https://docs.rwsdk.com/core/authentication).
 
 ## Further Reading
 
 - [RedwoodSDK Documentation](https://docs.rwsdk.com/)
-- [Cloudflare Workers Secrets](https://developers.cloudflare.com/workers/runtime-apis/secrets/)

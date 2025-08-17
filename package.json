@@ -1,5 +1,5 @@
 {
-  "name": "@redwoodjs/starter-standard",
+  "name": "open-ai-programmer",
   "version": "1.0.0",
   "description": "Build fast, server-driven webapps on Cloudflare with SSR, RSC, and realtime. ",
   "main": "index.js",
@@ -19,12 +19,13 @@
     "migrate:dev": "prisma generate && wrangler d1 migrations apply DB --local",
     "migrate:prd": "wrangler d1 migrations apply DB --remote",
     "migrate:new": "rw-scripts migrate-new",
-    "generate": "rw-scripts ensure-env && prisma generate && wrangler types",
+    "generate": "rw-scripts ensure-env && wrangler types",
     "check": "npm run generate && npm run types",
     "types": "tsc",
     "prepare": "vibe-rules install cursor"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.15",
     "@ai-sdk/react": "^2.0.15",
     "@cloudflare/sandbox": "^0.3.0",
     "@prisma/adapter-d1": "~6.8.2",
@@ -42,7 +43,7 @@
     "zod": "^4.0.17"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.7.4",
+    "@cloudflare/vite-plugin": "1.11.5",
     "@cloudflare/workers-types": "^4.20250407.0",
     "@types/node": "^22.14.0",
     "@types/react": "^19.1.2",
@@ -52,8 +53,8 @@
     "tw-animate-css": "^1.3.7",
     "typescript": "^5.8.3",
     "vibe-rules": "^0.2.31",
-    "vite": "^6.2.6",
-    "wrangler": "^4.20.5"
+    "vite": "^7.1.2",
+    "wrangler": "^4.30.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

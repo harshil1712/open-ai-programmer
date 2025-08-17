@@ -1,11 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "__change_me__",
+  "name": "open-ai-programmer",
   "main": "src/worker.tsx",
-  "compatibility_date": "2025-05-07",
+  "compatibility_date": "2025-08-07",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
-    "binding": "ASSETS"
+    "binding": "ASSETS",
+    "run_worker_first": true
   },
   "observability": {
     "enabled": true
@@ -31,4 +32,7 @@
       "tag": "v1"
     }
   ],
+  // "ai": {
+  //   "binding": "AI"
+  // }
 }
