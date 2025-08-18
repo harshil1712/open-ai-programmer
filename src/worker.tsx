@@ -43,14 +43,14 @@ const app = defineApp([
           messages: convertToModelMessages(messages),
           onFinish: async ({ text }) => {
             const hostname = new URL(request.url).host;
-            waitUntil(
-              writeAiCodeInSandbox(ctx.sandbox, text, hostname).then(
-                (previewUrl) => {
-                  currentPreviewUrl = previewUrl;
-                  console.log("[PREVIEW] URL stored:", previewUrl);
-                }
-              )
-            );
+            try {
+              // Make sandbox creation synchronous for immediate preview URL
+              const previewUrl = await writeAiCodeInSandbox(ctx.sandbox, text, hostname);
+              currentPreviewUrl = previewUrl;
+              console.log("[PREVIEW] URL ready:", previewUrl);
+            } catch (error) {
+              console.error("[PREVIEW] Sandbox creation failed:", error);
+            }
           },
         });
 
@@ -67,6 +67,39 @@ const app = defineApp([
           headers: { "Content-Type": "application/json" },
         }
       );
+    }),
+    route("/preview-stream", async () => {
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      
+      // Send current URL immediately if available
+      if (currentPreviewUrl) {
+        await writer.write(new TextEncoder().encode(`data: ${JSON.stringify({ previewUrl: currentPreviewUrl })}\n\n`));
+        await writer.close();
+      } else {
+        // Keep connection open and wait for URL
+        const checkInterval = setInterval(async () => {
+          if (currentPreviewUrl) {
+            await writer.write(new TextEncoder().encode(`data: ${JSON.stringify({ previewUrl: currentPreviewUrl })}\n\n`));
+            await writer.close();
+            clearInterval(checkInterval);
+          }
+        }, 500);
+        
+        // Timeout after 30 seconds
+        setTimeout(() => {
+          clearInterval(checkInterval);
+          writer.close();
+        }, 30000);
+      }
+      
+      return new Response(readable, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
     }),
     // route("/preview", Preview)
   ]),

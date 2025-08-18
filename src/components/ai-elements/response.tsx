@@ -134,6 +134,7 @@ export type ResponseProps = HTMLAttributes<HTMLDivElement> & {
     ReturnType<typeof hardenReactMarkdown>
   >["defaultOrigin"];
   parseIncompleteMarkdown?: boolean;
+  isStreaming?: boolean;
 };
 
 const components: Options["components"] = {
@@ -287,6 +288,9 @@ const components: Options["components"] = {
     if (
       isValidElement(children) &&
       children.props &&
+      typeof children.props === 'object' &&
+      children.props !== null &&
+      'children' in children.props &&
       typeof children.props.children === "string"
     ) {
       code = children.props.children;
@@ -318,8 +322,34 @@ export const Response = memo(
     allowedLinkPrefixes,
     defaultOrigin,
     parseIncompleteMarkdown: shouldParseIncompleteMarkdown = true,
+    isStreaming = false,
     ...props
   }: ResponseProps) => {
+    // During streaming, skip expensive parsing to prevent performance issues
+    if (isStreaming && typeof children === "string") {
+      return (
+        <div
+          className={cn(
+            "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
+            className
+          )}
+          {...props}
+        >
+          <HardenedMarkdown
+            allowedImagePrefixes={allowedImagePrefixes ?? ["*"]}
+            allowedLinkPrefixes={allowedLinkPrefixes ?? ["*"]}
+            components={components}
+            defaultOrigin={defaultOrigin}
+            rehypePlugins={[]}
+            remarkPlugins={[remarkGfm, remarkMath]}
+            {...options}
+          >
+            {children}
+          </HardenedMarkdown>
+        </div>
+      );
+    }
+
     // Parse the children to remove incomplete markdown tokens if enabled
     const parsedChildren =
       typeof children === "string" && shouldParseIncompleteMarkdown

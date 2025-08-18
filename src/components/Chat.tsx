@@ -22,14 +22,35 @@ export function ChatWindow({ onPreviewReady }: ChatWindowProps) {
       console.error("Chat error:", error);
     },
     onFinish: async () => {
+      // First try immediate fetch (if synchronous sandbox creation worked)
       try {
         const response = await fetch("/api/preview-status");
         const data = await response.json() as { previewUrl?: string };
         if (data.previewUrl) {
           onPreviewReady(data.previewUrl);
+          return;
         }
       } catch (error) {
-        console.error("Error getting preview URL:", error);
+        console.error("Error getting preview URL immediately:", error);
+      }
+
+      // Fallback to SSE stream for real-time updates
+      try {
+        const eventSource = new EventSource("/api/preview-stream");
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data) as { previewUrl?: string };
+          if (data.previewUrl) {
+            onPreviewReady(data.previewUrl);
+            eventSource.close();
+          }
+        };
+        
+        eventSource.onerror = () => {
+          console.error("SSE connection failed");
+          eventSource.close();
+        };
+      } catch (error) {
+        console.error("Error setting up SSE stream:", error);
       }
     },
   });
@@ -57,20 +78,30 @@ export function ChatWindow({ onPreviewReady }: ChatWindowProps) {
           <>
             <Conversation>
               <ConversationContent>
-                {messages.map((msg, index) => (
-                  <Message from={msg.role} key={index}>
-                    <MessageContent>
-                      {msg.parts.map((part, i) => {
-                        switch (part.type) {
-                          case "text":
-                            return <Response key={i}>{part.text}</Response>;
-                          default:
-                            return null;
-                        }
-                      })}
-                    </MessageContent>
-                  </Message>
-                ))}
+                {messages.map((msg, index) => {
+                  const isLastMessage = index === messages.length - 1;
+                  const isStreaming = isLastMessage && status === "streaming";
+                  const messageKey = msg.id || `msg-${index}`;
+                  
+                  return (
+                    <Message from={msg.role} key={messageKey}>
+                      <MessageContent>
+                        {msg.parts.map((part, i) => {
+                          switch (part.type) {
+                            case "text":
+                              return (
+                                <Response key={i} isStreaming={isStreaming}>
+                                  {part.text}
+                                </Response>
+                              );
+                            default:
+                              return null;
+                          }
+                        })}
+                      </MessageContent>
+                    </Message>
+                  );
+                })}
               </ConversationContent>
             </Conversation>
             {status === "submitted" && (
