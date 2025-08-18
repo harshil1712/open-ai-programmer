@@ -9,146 +9,109 @@ import remarkMath from "remark-math";
 import { CodeBlock, CodeBlockCopyButton } from "./code-block";
 import "katex/dist/katex.min.css";
 import hardenReactMarkdown from "harden-react-markdown";
-import { parseAIResponse } from "@/app/utils/sandbox";
+
+function parseAIResponse(response: string) {
+  const sections = {
+    files: [] as Array<{ path: string; content: string }>,
+  };
+
+  // Skip processing for very large responses to avoid performance issues
+  if (response.length > 50000) {
+    return sections;
+  }
+
+  // Parse file sections - handle duplicates and prefer complete versions
+  const fileMap = new Map<string, { content: string; isComplete: boolean }>();
+
+  const fileRegex = /<file path="([^"]+)">([\s\S]*?)(?:<\/file>|$)/g;
+  let match;
+  while ((match = fileRegex.exec(response)) !== null) {
+    const filePath = match[1];
+    const content = match[2].trim();
+    const hasClosingTag = match[0].includes("</file>");
+
+    // Check if this file already exists in our map
+    const existing = fileMap.get(filePath);
+
+    // Simplified replacement logic - prefer complete files or longer content
+    const shouldReplace = !existing || 
+      (!existing.isComplete && hasClosingTag) ||
+      (hasClosingTag && content.length > existing.content.length);
+
+    if (shouldReplace) {
+      // Skip validation for performance - trust the content
+      fileMap.set(filePath, { content, isComplete: hasClosingTag });
+    }
+  }
+
+  // Convert map to array for sections.files
+  sections.files = Array.from(fileMap.entries()).map(([path, { content }]) => ({
+    path,
+    content,
+  }));
+
+  return sections;
+}
 
 /**
  * Parses markdown text and removes incomplete tokens to prevent partial rendering
  * of links, images, bold, and italic formatting during streaming.
  */
 function parseIncompleteMarkdown(text: string): string {
-  if (!text || typeof text !== "string") {
+  if (!text || typeof text !== "string" || text.length < 2) {
+    return text;
+  }
+
+  // For very large texts, skip processing to avoid performance issues
+  if (text.length > 10000) {
     return text;
   }
 
   let result = text;
 
-  // Handle incomplete links and images
-  // Pattern: [...] or ![...] where the closing ] is missing
-  const linkImagePattern = /(!?\[)([^\]]*?)$/;
-  const linkMatch = result.match(linkImagePattern);
-  if (linkMatch) {
-    // If we have an unterminated [ or ![, remove it and everything after
-    const startIndex = result.lastIndexOf(linkMatch[1]);
-    result = result.substring(0, startIndex);
+  // Handle incomplete links and images - simple end check
+  if (result.endsWith('[') || result.endsWith('![')) {
+    const lastBracket = result.lastIndexOf('[');
+    result = result.substring(0, lastBracket);
   }
 
-  // Handle incomplete bold formatting (**)
-  const boldPattern = /(\*\*)([^*]*?)$/;
-  const boldMatch = result.match(boldPattern);
-  if (boldMatch) {
-    // Count the number of ** in the entire string
-    const asteriskPairs = (result.match(/\*\*/g) || []).length;
-    // If odd number of **, we have an incomplete bold - complete it
-    if (asteriskPairs % 2 === 1) {
-      result = `${result}**`;
+  // Simple pattern counting - much faster than complex regex
+  const patterns = [
+    { marker: '**', endPattern: /\*\*[^*]*?$/ },
+    { marker: '__', endPattern: /__[^_]*?$/ },
+    { marker: '~~', endPattern: /~~[^~]*?$/ }
+  ];
+
+  for (const { marker, endPattern } of patterns) {
+    const count = (result.match(new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) || []).length;
+    if (count % 2 === 1 && endPattern.test(result)) {
+      result = `${result}${marker}`;
     }
   }
 
-  // Handle incomplete italic formatting (__)
-  const italicPattern = /(__)([^_]*?)$/;
-  const italicMatch = result.match(italicPattern);
-  if (italicMatch) {
-    // Count the number of __ in the entire string
-    const underscorePairs = (result.match(/__/g) || []).length;
-    // If odd number of __, we have an incomplete italic - complete it
-    if (underscorePairs % 2 === 1) {
-      result = `${result}__`;
-    }
-  }
-
-  // Handle incomplete single asterisk italic (*)
-  const singleAsteriskPattern = /(\*)([^*]*?)$/;
-  const singleAsteriskMatch = result.match(singleAsteriskPattern);
-  if (singleAsteriskMatch) {
-    // Count single asterisks that aren't part of **
-    const singleAsterisks = result.split("").reduce((acc, char, index) => {
-      if (char === "*") {
-        // Check if it's part of a ** pair
-        const prevChar = result[index - 1];
-        const nextChar = result[index + 1];
-        if (prevChar !== "*" && nextChar !== "*") {
-          return acc + 1;
-        }
-      }
-      return acc;
-    }, 0);
-
-    // If odd number of single *, we have an incomplete italic - complete it
-    if (singleAsterisks % 2 === 1) {
+  // Handle single character markers more efficiently
+  if (result.endsWith('*') && !result.endsWith('**')) {
+    const asteriskCount = (result.match(/(?<!\*)\*(?!\*)/g) || []).length;
+    if (asteriskCount % 2 === 1) {
       result = `${result}*`;
     }
   }
 
-  // Handle incomplete single underscore italic (_)
-  const singleUnderscorePattern = /(_)([^_]*?)$/;
-  const singleUnderscoreMatch = result.match(singleUnderscorePattern);
-  if (singleUnderscoreMatch) {
-    // Count single underscores that aren't part of __
-    const singleUnderscores = result.split("").reduce((acc, char, index) => {
-      if (char === "_") {
-        // Check if it's part of a __ pair
-        const prevChar = result[index - 1];
-        const nextChar = result[index + 1];
-        if (prevChar !== "_" && nextChar !== "_") {
-          return acc + 1;
-        }
-      }
-      return acc;
-    }, 0);
-
-    // If odd number of single _, we have an incomplete italic - complete it
-    if (singleUnderscores % 2 === 1) {
+  if (result.endsWith('_') && !result.endsWith('__')) {
+    const underscoreCount = (result.match(/(?<!_)_(?!_)/g) || []).length;
+    if (underscoreCount % 2 === 1) {
       result = `${result}_`;
     }
   }
 
-  // Handle incomplete inline code blocks (`) - but avoid code blocks (```)
-  const inlineCodePattern = /(`)([^`]*?)$/;
-  const inlineCodeMatch = result.match(inlineCodePattern);
-  if (inlineCodeMatch) {
-    // Check if we're dealing with a code block (triple backticks)
-    const hasCodeBlockStart = result.includes("```");
-    const codeBlockPattern = /```[\s\S]*?```/g;
-    const completeCodeBlocks = (result.match(codeBlockPattern) || []).length;
-    const allTripleBackticks = (result.match(/```/g) || []).length;
-
-    // If we have an odd number of ``` sequences, we're inside an incomplete code block
-    // In this case, don't complete inline code
-    const insideIncompleteCodeBlock = allTripleBackticks % 2 === 1;
-
-    if (!insideIncompleteCodeBlock) {
-      // Count the number of single backticks that are NOT part of triple backticks
-      let singleBacktickCount = 0;
-      for (let i = 0; i < result.length; i++) {
-        if (result[i] === "`") {
-          // Check if this backtick is part of a triple backtick sequence
-          const isTripleStart = result.substring(i, i + 3) === "```";
-          const isTripleMiddle =
-            i > 0 && result.substring(i - 1, i + 2) === "```";
-          const isTripleEnd = i > 1 && result.substring(i - 2, i + 1) === "```";
-
-          if (!(isTripleStart || isTripleMiddle || isTripleEnd)) {
-            singleBacktickCount++;
-          }
-        }
-      }
-
-      // If odd number of single backticks, we have an incomplete inline code - complete it
+  // Handle backticks - simplified logic
+  if (result.endsWith('`') && !result.endsWith('```')) {
+    const tripleBacktickCount = (result.match(/```/g) || []).length;
+    if (tripleBacktickCount % 2 === 0) { // Not inside code block
+      const singleBacktickCount = (result.match(/(?<!`)(?<!``)`(?!`)(?!``)/g) || []).length;
       if (singleBacktickCount % 2 === 1) {
         result = `${result}\``;
       }
-    }
-  }
-
-  // Handle incomplete strikethrough formatting (~~)
-  const strikethroughPattern = /(~~)([^~]*?)$/;
-  const strikethroughMatch = result.match(strikethroughPattern);
-  if (strikethroughMatch) {
-    // Count the number of ~~ in the entire string
-    const tildePairs = (result.match(/~~/g) || []).length;
-    // If odd number of ~~, we have an incomplete strikethrough - complete it
-    if (tildePairs % 2 === 1) {
-      result = `${result}~~`;
     }
   }
 

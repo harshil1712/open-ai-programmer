@@ -12,10 +12,25 @@ import {
 } from "./ai-elements/prompt-input";
 import { Response } from "./ai-elements/response";
 
-export function ChatWindow() {
+interface ChatWindowProps {
+  onPreviewReady: (url: string) => void;
+}
+
+export function ChatWindow({ onPreviewReady }: ChatWindowProps) {
   const { messages, sendMessage, status } = useChat({
     onError: (error) => {
       console.error("Chat error:", error);
+    },
+    onFinish: async () => {
+      try {
+        const response = await fetch("/api/preview-status");
+        const data = await response.json() as { previewUrl?: string };
+        if (data.previewUrl) {
+          onPreviewReady(data.previewUrl);
+        }
+      } catch (error) {
+        console.error("Error getting preview URL:", error);
+      }
     },
   });
   const [input, setInput] = useState("");
